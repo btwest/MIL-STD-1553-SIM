@@ -38,7 +38,7 @@ class BC_Message_Encoder:
             command_word = command_word + data_word_count
 
         if len(command_word) < 7 or len(command_word) > 7:
-            raise Exception("Invaid data input. Command word format does not match.")
+            raise Exception("Invalid data input. Command word format does not match.")
         command_frame = \
             BC_Data_Link_Encoder().build_cmd_word(command_word)
         return command_frame
@@ -51,7 +51,26 @@ class BC_Message_Encoder:
 
     def send_message_to_RT(
             self, rt_address, sub_address_or_mode_code, message):
-        pass
+        communication_frames = list()
+        data_word_characters = list()
+        message = message + "." if(len(message) % 2 != 0) else message
+        for i in range(0, len(message)-1,2):
+            data_word_characters.append(message[i:i+2])
+            communication_frames.append(
+                self.construct_data_word(message[i:i+2].encode("utf-8").hex())
+            )
+        data_word_count = '{0:02}'.format(len(data_word_characters))
+        communication_frames.insert(0,self.construct_command_word(
+            rt_address, "R", sub_address_or_mode_code, data_word_count
+        ))
+        return communication_frames
 
     def receive_message_from_RT(self, rt_address, sub_address_or_mode_code, data_word_count):
-        pass
+        communication_frames = list()
+        communication_frames.append(
+            self.construct_command_word(
+                rt_address, "T", sub_address_or_mode_code, data_word_count
+            )
+        )
+        return communication_frames
+        

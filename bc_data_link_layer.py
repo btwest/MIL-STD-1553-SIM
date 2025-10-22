@@ -77,11 +77,77 @@ class BC_Data_Link_Decoder:
             print("Exception while decoding a data word from an RT")
             
 class BC_Data_Link_Encoder:
+
     def _char_check(self, character):
-        pass
+        if not str.isdigit(character):
+            print("Invalid address bits")
+            return False
+        elif int(character) != 0 and int(character) != 1:
+            print("Invalid address bits 1")
+            return False
+        return True
+    
 
     def build_cmd_word(self, cmd_word):
-        pass
+        try:
+            cmd_word_frame = '100'
+
+            char1 = cmd_word[0]
+            if not self._char_check(char1):
+                exit()
+            cmd_word_frame = cmd_word_frame + char1
+
+            char2 = cmd_word[1]
+            cmd_word_frame = cmd_word_frame + '{0:04b}'.format(int(char2,16))
+
+            char3 = cmd_word[2]
+            if char3 == 'R':
+                cmd_word_frame = cmd_word_frame + '0'
+            elif char3 == 'T':
+                cmd_word_frame = cmd_word_frame + '1'
+            else:
+                print("Invalid TR bit")
+                exit()
+
+            char4 = cmd_word[3]
+            if not self._char_check(char4):
+                exit()
+            cmd_word_frame = cmd_word_frame + char4
+
+            char5 = cmd_word[4]
+            cmd_word_frame = cmd_word_frame + '{0:04b}'.format(int(char5,16))
+
+            char6 = cmd_word[5]
+            if not self._char_check(char6):
+                exit()
+            cmd_word_frame = cmd_word_frame + char6
+
+            char7 = cmd_word[6]
+            cmd_word_frame = cmd_word_frame + '{0:04b}'.format(int(char7,16))
+
+            cmd_word_frame = cmd_word_frame + '1'
+
+            return cmd_word_frame
+        except Exception as ex:
+            print("Exception while building a command word frame")
+            print("    Exception:{}".format(str(ex)))
+
 
     def build_data_word(self, data_word):
-        pass
+        try:
+            if(len(data_word) != 4):
+                print("Data word must be 4 hex characters long")
+                exit()
+            
+            data_word_frame = '001'
+
+            for character in data_word:
+                data_word_frame = data_word_frame + '{0:04b}'.format(int(character,16))
+
+            data_word_frame = data_word_frame + '1'
+
+            return data_word_frame
+                   
+        except Exception as ex:
+            print("Exception while building a data word frame")
+            print("    Exception:{}".format(str(ex)))   
