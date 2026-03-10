@@ -16,54 +16,52 @@ class BC_Data_Link_Decoder:
         try:
             status_word = {}
 
-            self.rt_address = self.rt_address + status_word_frame[3]
-
-            addr_char = status_word_frame[4:8]
-            self.rt_address = self.rt_address + str(hex(int(addr_char, 2)))[2:]
-            status_word['rt_address'] = self.rt_address
+            # Build rt_address as a local variable — not stored on self
+            rt_address = status_word_frame[3]
+            rt_address += hex(int(status_word_frame[4:8], 2))[2:]
+            status_word['rt_address'] = rt_address
 
             # Error bit
-            self.message_error_bit = status_word_frame[8]
-            status_word['message_error_bit'] = self.message_error_bit
-            
-            # Instrumentation bit
-            self.instrumentation_bit = status_word_frame[9]
-            status_word['instrumentation_bit'] = self.instrumentation_bit
+            status_word['message_error_bit']            = status_word_frame[8]
 
+            # Instrumentation bit
+            status_word['instrumentation_bit']          = status_word_frame[9]
+        
             # Service request bit
-            self.service_request_bit = status_word_frame[10]
-            status_word['service_request_bit'] = self.service_request_bit
+            status_word['service_request_bit']          = status_word_frame[10]
 
             # Reserved bits
-            self.reserved_bits = status_word_frame[11:14]
-            status_word['reserved_bits'] = self.reserved_bits
+            status_word['reserved_bits']                = status_word_frame[11:14]
 
-            # BRDCST received bit
-            self.brdcst_received_bit = status_word_frame[14]
-            status_word['brdcst_received'] = self.brdcst_received_bit
+            # Broadcast received bit
+            status_word['brdcst_received']              = status_word_frame[14]
 
             # Busy bit
-            self.busy_bit = status_word_frame[15]
-            status_word['busy_bit'] = self.busy_bit
+            status_word['busy_bit']                     = status_word_frame[15]
 
             # Subsystem flag bit
-            self.subsystem_flag_bit = status_word_frame[16]
-            status_word['subsystem_flag_bit'] = self.subsystem_flag_bit
+            status_word['subsystem_flag_bit']           = status_word_frame[16]
 
             # Dynamic bus control accept bit
-            self.dynamic_bus_control_accpt_bit = status_word_frame[17]
-            status_word['dynamic_bus_control_accpt_bit'] = self.dynamic_bus_control_accpt_bit
+            status_word['dynamic_bus_control_accpt_bit']= status_word_frame[17]
 
             # Terminal flag bit
-            self.terminal_flag_bit = status_word_frame[18]
-            status_word['terminal_flag_bit'] = self.terminal_flag_bit
+            status_word['terminal_flag_bit']            = status_word_frame[18]
 
-            print (status_word)
             return status_word
+
         except Exception as ex:
             print("Exception while decoding a status word from an RT")
-            print("    Exception:{}".format(str(ex)))
-        
+            print(f"    Exception: {ex}")
+        def decode_command_word(self, frame):
+            # Command words and status words share identical bit layout.
+            # This wrapper exists to make intent explicit at the call site.
+            return self.decode_status_word(frame)
+    
+    def decode_command_word(self, frame):
+        # Command words and status words share identical bit layout.
+        # This wrapper exists to make intent explicit at the call site.
+        return self.decode_status_word(frame)
 
     def decode_data_word(self, data_word_frame):
         try:
@@ -77,6 +75,10 @@ class BC_Data_Link_Decoder:
             print("Exception while decoding a data word from an RT")
             
 class BC_Data_Link_Encoder:
+
+    def _validate_bit(self, character, label="bit"):
+        if character not in ('0', '1'):
+            raise ValueError(f"Invalid {label}: '{character}' — must be '0' or '1'")
 
     def _char_check(self, character):
         if not str.isdigit(character):
@@ -132,6 +134,23 @@ class BC_Data_Link_Encoder:
             print("Exception while building a command word frame")
             print("    Exception:{}".format(str(ex)))
 
+    def build_status_word(self, rt_address_msb, rt_address_nibble,
+                        message_error=0, busy=0, terminal_flag=0):
+        frame = '100'
+        self._validate_bit(rt_address_msb, "RT address MSB")
+        frame += rt_address_msb
+        frame += '{0:04b}'.format(int(rt_address_nibble, 16))
+        frame += str(message_error)
+        frame += '0'   # instrumentation
+        frame += '0'   # service request
+        frame += '000' # reserved
+        frame += '0'   # broadcast received
+        frame += str(busy)
+        frame += '0'   # subsystem flag
+        frame += '0'   # dynamic bus control
+        frame += str(terminal_flag)
+        frame += '1'   # parity
+        return frame
 
     def build_data_word(self, data_word):
         try:

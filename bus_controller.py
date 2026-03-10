@@ -22,6 +22,8 @@ class Bus_Controller:
     def __init__(self):
         self.sender = BC_Sender()
         self.listener = BC_Listener()
+        self.received_messages = []
+        self._rx_lock = threading.Lock()
 
     def _send_data(self, frames):
         """
@@ -40,46 +42,37 @@ class Bus_Controller:
             time.sleep(1) # simulate timing between words
     
     def _handle_incoming_frame(self, frame):
-        """
-        Handles an incoming frame from an RT.
-        
-        Args: frame(str): tha raw received frame data.
-        
-        Process:
-            - Decodes the incoming frame using the Message Layer Decoder.
-            - Prints the interpreted word to the console.
-            - In a more advanced simulation, this could feed into 
-            a message reassembly or logging subsystem. 
-        """
         decoded = BC_Message_Decoder().interpret_incoming_frame(frame)
-        print(decoded)
+        if isinstance(decoded, bytes):
+            text = decoded.decode('utf-8')
+            print(decoded)
+            with self._rx_lock:
+                self.received_messages.append(text)
+        else:
+            print(decoded)
 
     
     # ------------------------------ PUBLIC METHODS -----------------------------
 
 
     def start_listener(self):
-        """
-        Starts a background listener thread for receiving RT responses.
-        
-        - The BC_Listener simulates the physical bus listener.
-        - The listener continuously polls for received data.
-        - When new data arrives, it is passed to _handle_incoming_frame().
-        
-        NOTE:
-        - The loop runs indefinitely (as a blocking call).
-        - Each incoming frame is processed and removed from the queue.
-        """
         listener_thread = threading.Thread(
             target=self.listener.start_listening,
             daemon=True
         )
         listener_thread.start()
 
-        # Continuously poll the listener buffer
+        poll_thread = threading.Thread(
+            target=self._poll_listener,
+            daemon=True
+        )
+        poll_thread.start()
+
+    def _poll_listener(self):
         while True:
             if self.listener.data_received:
                 self._handle_incoming_frame(self.listener.data_received.pop(0))
+            time.sleep(0.01)
 
     def send_data_to_rt(self, rt_address, sub_address_or_mode_code, message):
         """
@@ -120,21 +113,24 @@ class Bus_Controller:
         frames = BC_Message_Encoder().receive_message_from_RT(rt_address, sub_address_or_mode_code, word_count)
         self._send_data(frames)
 
+    def get_received_text(self):
+        with self._rx_lock:
+            result = ''.join(self.received_messages)
+            self.received_messages.clear()
+        return result
+
 # ------------------------------ ENTRY POINT ------------------------------
 
 if __name__ == "__main__":
-    """
-    When executed directly, this starts the BC listener in a background thread.
-    
-    This simulates the BC continuously monitoring the bus for RT responses.
-    The listener thread can run concurrently while the user calls
-    send_data_to_rt() or receive_data_from_rt() from another terminal or script.
-    """
     bc = Bus_Controller()
     bc_listener_thread = threading.Thread(
         target=bc.start_listener,
-        daemon=True  
+        daemon=True
     )
     bc_listener_thread.start()
-
-        
+    
+    print("Bus Controller running. Press Ctrl+C to exit.")
+    try:
+        threading.Event().wait()  # blocks forever until Ctrl+C
+    except KeyboardInterrupt:
+        print("Shutdown.")

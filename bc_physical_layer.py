@@ -5,12 +5,9 @@ class BC_Sender:
     def send_message(self, message):
         destination_ip = "255.255.255.255"
         destination_port = 2001
-        socket_variable = \
-            socket.socket(
-                socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-        socket_variable.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        socket_variable.sendto(message, (destination_ip, destination_port))
-        
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.sendto(message.encode('utf-8'), (destination_ip, destination_port))
 
 class BC_Listener:
     def __init__(self):
@@ -25,7 +22,7 @@ class BC_Listener:
         socket_variable.bind(("", port))
         while True:
             data, addr = socket_variable.recvfrom(1024)
-            self.data_received.append(str(data))
+            self.data_received.append(data.decode('utf-8'))
 
 if __name__ == "__main__":
     listener = BC_Listener()

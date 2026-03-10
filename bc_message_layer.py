@@ -25,6 +25,7 @@ class BC_Message_Encoder:
     def construct_command_word(
             self, rt_address, tr_bit, sub_address, data_word_count
     ):
+        command_word = ""
         if not len(rt_address) > 2:
             command_word = command_word + rt_address
 
