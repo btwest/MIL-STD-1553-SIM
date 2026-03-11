@@ -107,7 +107,7 @@ Bits 12–15 : Word count nibble
 
 ```bash
 # Clone the repo
-git clone https://github.com/your-username/MIL-STD-1553-SIM
+git clone https://github.com/btwest/MIL-STD-1553-SIM.git
 cd MIL-STD-1553-SIM
 
 # Create and activate virtual environment
