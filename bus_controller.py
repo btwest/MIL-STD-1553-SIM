@@ -24,6 +24,13 @@ class Bus_Controller:
         self.listener = BC_Listener()
         self.received_messages = []
         self._rx_lock = threading.Lock()
+        self.received_statuses = []
+
+    def get_last_status(self):
+        with self._rx_lock:
+            if self.received_statuses:
+                return self.received_statuses.pop()
+            return None
 
     def _send_data(self, frames):
         """
@@ -45,11 +52,13 @@ class Bus_Controller:
         decoded = BC_Message_Decoder().interpret_incoming_frame(frame)
         if isinstance(decoded, bytes):
             text = decoded.decode('utf-8')
-            print(decoded)
+            print(f"[BC] Received data: '{text}'")
             with self._rx_lock:
                 self.received_messages.append(text)
         else:
-            print(decoded)
+            with self._rx_lock:
+                self.received_statuses.append(decoded)
+                print(f"[BC] Received status: {decoded}")
 
     
     # ------------------------------ PUBLIC METHODS -----------------------------
@@ -123,11 +132,7 @@ class Bus_Controller:
 
 if __name__ == "__main__":
     bc = Bus_Controller()
-    bc_listener_thread = threading.Thread(
-        target=bc.start_listener,
-        daemon=True
-    )
-    bc_listener_thread.start()
+    bc.start_listener()
     
     print("Bus Controller running. Press Ctrl+C to exit.")
     try:

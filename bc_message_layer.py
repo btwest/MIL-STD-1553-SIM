@@ -55,12 +55,12 @@ class BC_Message_Encoder:
         communication_frames = list()
         data_word_characters = list()
         message = message + "." if(len(message) % 2 != 0) else message
-        for i in range(0, len(message)-1,2):
+        for i in range(0, len(message),2):
             data_word_characters.append(message[i:i+2])
             communication_frames.append(
                 self.construct_data_word(message[i:i+2].encode("utf-8").hex())
             )
-        data_word_count = '{0:02}'.format(len(data_word_characters))
+        data_word_count = '{0:02x}'.format(len(data_word_characters))
         communication_frames.insert(0,self.construct_command_word(
             rt_address, "R", sub_address_or_mode_code, data_word_count
         ))

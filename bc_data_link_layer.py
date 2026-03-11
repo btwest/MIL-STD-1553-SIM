@@ -1,17 +1,6 @@
 
 class BC_Data_Link_Decoder:
 
-    message_error_bit = ''
-    instrumentation_bit = ''
-    service_request_bit = ''
-    reserved_bits = ''
-    brdcst_received_bit = ''
-    busy_bit = ''
-    subsystem_flag_bit = ''
-    dynamic_bus_control_accpt_bit = ''
-    terminal_flag_bit = ''
-    rt_address = ''
-    
     def decode_status_word(self, status_word_frame):
         try:
             status_word = {}
@@ -53,11 +42,7 @@ class BC_Data_Link_Decoder:
         except Exception as ex:
             print("Exception while decoding a status word from an RT")
             print(f"    Exception: {ex}")
-        def decode_command_word(self, frame):
-            # Command words and status words share identical bit layout.
-            # This wrapper exists to make intent explicit at the call site.
-            return self.decode_status_word(frame)
-    
+  
     def decode_command_word(self, frame):
         # Command words and status words share identical bit layout.
         # This wrapper exists to make intent explicit at the call site.

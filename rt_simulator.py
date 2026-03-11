@@ -11,8 +11,8 @@ class RT_Simulator:
         # Each value is a string of exactly N*2 characters (N data words * 2 bytes each)
         self.subaddress_buffers = {
             '01': 'HDG095', # Heading
-            '02': 'ALT3200', # Altitude
-            '03': 'SPD0480', # Airspeed
+            '02': 'ALT32000', # Altitude
+            '03': 'SPD04800', # Airspeed
         }
 
         self.encoder = BC_Data_Link_Encoder()
@@ -20,10 +20,11 @@ class RT_Simulator:
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(("", 2001))  
+        
 
 
     def start(self):
+        self.sock.bind(("", 2001)) 
         print(f"[RT {self.rt_address}] Listening on port 2001...")
         while True:
             try:
@@ -52,28 +53,30 @@ class RT_Simulator:
         
         # Read the T/R bit — position 8 in the frame
         tr_bit = frame[8]
+        
 
         # Read the subaddress — MSB at position 9, nibble at positions 10:14
         sub_msb = frame[9]
         sub_nibble = frame[10:14]
         sub_address = sub_msb + hex(int(sub_nibble, 2))[2:]
+
+        # read the word count
+        wc_msb = int(frame[14])
+        wc_nibble = int(frame[15:19], 2)
+        word_count = wc_msb * 16 + wc_nibble
         
         if tr_bit == '0':  # Receive — BC is sending data to us
-            self._receive_data(sub_address)
+            self._receive_data(sub_address, word_count)
         elif tr_bit == '1':  # Transmit — BC wants data from us
             self._transmit_data(sub_address)
 
-    def _receive_data(self, sub_address):
+    def _receive_data(self, sub_address, word_count):
         received_words = []
         
-        # Listen for incoming data words
-        while True:
+        # Loop through words
+        for word in range (word_count):
             data, addr = self.sock.recvfrom(1024)
             frame = data.decode('utf-8')
-            
-            # Stop when we see a new command word
-            if frame[0:3] == '100':
-                break
                 
             # Decode the data word and store it
             if frame[0:3] == '001':
@@ -89,22 +92,23 @@ class RT_Simulator:
         self._send_status()
 
     def _send_status(self):
+        try:
+            status_frame = self.encoder.build_status_word(
+            rt_address_msb='0',
+            rt_address_nibble=self.rt_address[1],
+            message_error=0,
+            busy=0,
+            terminal_flag=0
+            )
+            self.sock.sendto(status_frame.encode('utf-8'), ("127.0.0.1", 2000))
+            print(f"[RT {self.rt_address}] Sent status word")
+        except OSError:
+            pass
+
+    def _transmit_data(self, sub_address):
         if self.drop_response:
             print(f"[RT {self.rt_address}] Dropping response (fault simulation)")
             return
-        
-        status_frame = self.encoder.build_status_word(
-            rt_address_msb='0',
-            rt_address_nibble=self.rt_address[1],
-            message_error='0',
-            busy=0,
-            terminal_flag=0
-        )
-
-        self.sock.sendto(status_frame.encode('utf-8'), ("127.0.0.1", 2000))
-        print(f"[RT {self.rt_address}] Sent status word")
-
-    def _transmit_data(self, sub_address):
         # Check if there is data for this subaddress
         if sub_address not in self.subaddress_buffers:
             print(f"[RT {self.rt_address}] No data for subaddress {sub_address}")
@@ -121,10 +125,13 @@ class RT_Simulator:
         if len(payload) %2 != 0:
             payload += '.'
         
-        #Encode and send data word
-        for i in range(0, len(payload), 2):
-            pair = payload[i:i+2]
-            hex_payload = pair.encode('utf-8').hex()
-            data_frame = self.encoder.build_data_word(hex_payload)
-            self.sock.sendto(data_frame.encode('utf-8'), ("127.0.0.1", 2000))
-            print(f"[RT {self.rt_address}] Sent data word: '{pair}'")
+        try:
+            #Encode and send data word
+            for i in range(0, len(payload), 2):
+                pair = payload[i:i+2]
+                hex_payload = pair.encode('utf-8').hex()
+                data_frame = self.encoder.build_data_word(hex_payload)
+                self.sock.sendto(data_frame.encode('utf-8'), ("127.0.0.1", 2000))
+                print(f"[RT {self.rt_address}] Sent data word: '{pair}'")
+        except OSError:
+            pass

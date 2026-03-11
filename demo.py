@@ -16,33 +16,35 @@ def print_scenario(number, title):
 
 
 def scenario_1(bc):
-        print_scenario(1, "BC → RT Write")
-        print("  BC sending 'NAVIGATE' to RT-02 subaddress 01...")
-        bc.send_data_to_rt('02', '01', 'NAVIGATE')
-        time.sleep(1)  # Give RT time to process and respond
+    print_scenario(1, "BC → RT Write")
+    print("  BC sending 'NAVIGATE' to RT-02 subaddress 01...")
+    bc.send_data_to_rt('02', '01', 'NAVIGATE')
+    time.sleep(10)  # Give RT time to process and respond
+    status = bc.get_last_status()
+    if status and status['message_error_bit'] == '0':
         print("  RT-02 acknowledged ✓")
+    else:
+        print("  RT-02 did NOT acknowledge ✗")
 def scenario_2(bc):
-        print_scenario(2, "BC → RT Read (Telemetry Poll)")
-        print("  BC polling RT-02 subaddress 01 (Heading)...")
-        bc.receive_data_from_rt('02', '01', '03')
+    print_scenario(2, "BC → RT Read (Telemetry Poll)")
+    print("  BC polling RT-02 subaddress 02 (Altitude)...")
+    bc.receive_data_from_rt('02', '02', '04')
+    time.sleep(5)
+    received = bc.get_received_text()
+    print(f"  Received from RT-02: '{received}' ✓")
+def scenario_3(bc):
+    print_scenario(3, "BC → RT Full Telemetry Poll")
+    subaddresses = {
+        '01': ('Heading',   '03'),
+        '02': ('Altitude',  '04'),
+        '03': ('Airspeed',  '04'),
+    }
+    for sa, (label, word_count) in subaddresses.items():
+        print(f"  Polling RT-02 subaddress {sa} ({label})...")
+        bc.receive_data_from_rt('02', sa, word_count)
         time.sleep(1)
         received = bc.get_received_text()
-        print(f"  Received from RT-02: '{received}' ✓")
-def scenario_3(bc):
-        print_scenario(3, "BC → RT Full Telemetry Poll")
-        
-        subaddresses = {
-            '01': ('Heading',   '03'),
-            '02': ('Altitude',  '04'),
-            '03': ('Airspeed',  '04'),
-        }
-        
-        for sa, (label, word_count) in subaddresses.items():
-            print(f"  Polling RT-02 subaddress {sa} ({label})...")
-            bc.receive_data_from_rt('02', sa, word_count)
-            time.sleep(1)
-            received = bc.get_received_text()
-            print(f"  {label}: '{received}' ✓")
+        print(f"  {label}: '{received}' ✓")
 def scenario_4(bc, rt):
     print_scenario(4, "Fault Simulation — RT Not Responding")
     rt.stop()

@@ -148,22 +148,10 @@ The RT is restarted with `drop_response=True`, simulating a terminal that has go
 
 ---
 
-## Protocol Notes
+## Notes
 
 **Timing:** Real MIL-STD-1553 operates at 1 Mbit/s with a 4 µs inter-message gap and a 14 µs no-response timeout. This simulator uses `time.sleep()` delays in the range of seconds for demo visibility.
 
 **Parity:** The parity bit is simulated as always-valid (`1`). Real implementations use odd parity computed over the 16-bit payload.
 
 **Dual redundancy:** The physical layer supports Bus A and Bus B with automatic failover on transmission error, matching the MIL-STD-1553B §4.2 requirement that all terminals connect to both buses.
-
----
-
-## Relevance to Defense Tech
-
-MIL-STD-1553 appears in job descriptions at Anduril, Northrop Grumman, L3Harris, Leidos, and Raytheon for avionics and embedded systems roles. This project demonstrates:
-
-- Layered protocol architecture (physical → data link → message → application)
-- Binary frame encoding and decoding
-- Master/slave bus arbitration
-- Dual-redundancy and fault tolerance
-- Threaded real-time communication patterns
