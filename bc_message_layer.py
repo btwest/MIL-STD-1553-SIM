@@ -60,7 +60,8 @@ class BC_Message_Encoder:
             communication_frames.append(
                 self.construct_data_word(message[i:i+2].encode("utf-8").hex())
             )
-        data_word_count = '{0:02x}'.format(len(data_word_characters))
+        n = len(data_word_characters)
+        data_word_count = '{0:02x}'.format(0 if n == 32 else n)
         communication_frames.insert(0,self.construct_command_word(
             rt_address, "R", sub_address_or_mode_code, data_word_count
         ))

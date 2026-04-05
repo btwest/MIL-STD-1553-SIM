@@ -37,6 +37,13 @@ class BC_Data_Link_Decoder:
             # Terminal flag bit
             status_word['terminal_flag_bit']            = status_word_frame[18]
 
+            # Parity validation
+            payload = status_word_frame[3:19]
+            expected_parity = '0' if payload.count('1') % 2 == 1 else '1'
+            status_word['parity_error'] = status_word_frame[19] != expected_parity
+            if status_word['parity_error']:
+                print("[WARN] Parity error in status word")
+
             return status_word
 
         except Exception as ex:
@@ -55,6 +62,13 @@ class BC_Data_Link_Decoder:
             for i in range(3, len(data_word_frame)-4,4):
                 data_set = data_word_frame[i:i+4]
                 data_word = data_word + str(hex(int(data_set, 2)))[2:]
+
+            # Parity validation
+            payload = data_word_frame[3:19]
+            expected_parity = '0' if payload.count('1') % 2 == 1 else '1'
+            if data_word_frame[19] != expected_parity:
+                print("[WARN] Parity error in data word")
+
             return data_word
         except Exception as ex:
             print("Exception while decoding a data word from an RT")
@@ -73,6 +87,12 @@ class BC_Data_Link_Encoder:
             print("Invalid address bits 1")
             return False
         return True
+
+    def _compute_odd_parity(self, payload_bits: str) -> str:
+        """Odd parity: total 1s across 16-bit payload + parity bit must be odd."""
+        ones = payload_bits.count('1')
+        return '0' if ones % 2 == 1 else '1'
+
     
 
     def build_cmd_word(self, cmd_word):
@@ -112,7 +132,7 @@ class BC_Data_Link_Encoder:
             char7 = cmd_word[6]
             cmd_word_frame = cmd_word_frame + '{0:04b}'.format(int(char7,16))
 
-            cmd_word_frame = cmd_word_frame + '1'
+            cmd_word_frame = cmd_word_frame + self._compute_odd_parity(cmd_word_frame[3:19])
 
             return cmd_word_frame
         except Exception as ex:
@@ -134,7 +154,7 @@ class BC_Data_Link_Encoder:
         frame += '0'   # subsystem flag
         frame += '0'   # dynamic bus control
         frame += str(terminal_flag)
-        frame += '1'   # parity
+        frame += self._compute_odd_parity(frame[3:19])  # parity
         return frame
 
     def build_data_word(self, data_word):
@@ -148,7 +168,7 @@ class BC_Data_Link_Encoder:
             for character in data_word:
                 data_word_frame = data_word_frame + '{0:04b}'.format(int(character,16))
 
-            data_word_frame = data_word_frame + '1'
+            data_word_frame = data_word_frame + self._compute_odd_parity(data_word_frame[3:19])
 
             return data_word_frame
                    

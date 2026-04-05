@@ -46,23 +46,26 @@ def scenario_3(bc):
         received = bc.get_received_text()
         print(f"  {label}: '{received}' ✓")
 def scenario_4(bc, rt):
-    print_scenario(4, "Fault Simulation — RT Not Responding")
+    print_scenario(4, "Fault Simulation — Bus A Failure with Bus B Failover")
     rt.stop()
     time.sleep(0.5)
-    rt_silent = RT_Simulator(rt_address='02', drop_response=True)
-    rt_silent_thread = threading.Thread(target=rt_silent.start, daemon=True)
-    rt_silent_thread.start()
+
+    # RT that silently drops all responses on Bus A, simulating a Bus A hardware failure.
+    # It still listens and responds normally on Bus B.
+    rt_bus_a_down = RT_Simulator(rt_address='02', drop_bus='A')
+    rt_thread = threading.Thread(target=rt_bus_a_down.start, daemon=True)
+    rt_thread.start()
     time.sleep(0.5)
-    print("  BC polling RT-02 subaddress 01 (Heading)...")
-    print("  RT-02 is not responding — waiting for timeout...")
-    bc.receive_data_from_rt('02', '01', '03')
-    time.sleep(3)
+
+    print("  Bus A is simulated as down — BC will timeout and failover to Bus B...")
+    bc.receive_data_from_rt('02', '01', '03')  # blocks through the full failover sequence
+    time.sleep(5)  # allow Bus B response frames to arrive via the listener thread
     received = bc.get_received_text()
-    if not received:
-        print("  No response received from RT-02 ✗")
-        print("  [BC] Timeout — marking RT-02 as unresponsive")
+    if received:
+        print(f"  Received from RT-02 via Bus B: '{received}' ✓")
+        print(f"  [BC] Now operating on Bus {bc._active_bus}")
     else:
-        print(f"  Received: '{received}'")
+        print("  No response received from RT-02 ✗")
 
 def main():
     print_header()

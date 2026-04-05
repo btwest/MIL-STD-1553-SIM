@@ -46,7 +46,7 @@ Key characteristics:
 ┌───────────────────────▼─────────────────────────────┐
 │              BC_Data_Link_Layer                      │
 │         (bc_data_link_layer.py)                      │
-│   20-bit frame encode/decode · Sync · Parity         │
+│   20-bit frame encode/decode · Sync · Odd parity     │
 └───────────────────────┬─────────────────────────────┘
                         │
 ┌───────────────────────▼─────────────────────────────┐
@@ -58,10 +58,10 @@ Key characteristics:
 
 ### Simulated bus mapping
 
-| Bus   | BC sends to | BC listens on |
-| ----- | ----------- | ------------- |
-| Bus A | port 2001   | port 2000     |
-| Bus B | port 2003   | port 2002     |
+| Bus   | BC sends to | BC listens on | RT listens on |
+| ----- | ----------- | ------------- | ------------- |
+| Bus A | port 2001   | port 2000     | port 2001     |
+| Bus B | port 2003   | port 2002     | port 2003     |
 
 ---
 
@@ -92,14 +92,14 @@ Bits 12–15 : Word count nibble
 
 ## Files
 
-| File                    | Description                                                         |
-| ----------------------- | ------------------------------------------------------------------- |
-| `bus_controller.py`     | Bus Controller — initiates all communication                        |
-| `rt_simulator.py`       | Remote Terminal — responds to BC commands, holds subaddress buffers |
-| `bc_message_layer.py`   | Message layer — frame sequencing, word count management             |
-| `bc_data_link_layer.py` | Data link layer — 20-bit frame encode/decode                        |
-| `bc_physical_layer.py`  | Physical layer — UDP socket simulation                              |
-| `demo.py`               | Entry point — runs all demonstration scenarios                      |
+| File                    | Description                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------- |
+| `bus_controller.py`     | Bus Controller — initiates all communication, dual-bus failover logic              |
+| `rt_simulator.py`       | Remote Terminal — responds on Bus A and Bus B, holds subaddress buffers            |
+| `bc_message_layer.py`   | Message layer — frame sequencing, word count management                            |
+| `bc_data_link_layer.py` | Data link layer — 20-bit frame encode/decode, odd parity computation and validation|
+| `bc_physical_layer.py`  | Physical layer — UDP socket simulation, per-bus sender/listener instances          |
+| `demo.py`               | Entry point — runs all demonstration scenarios                                     |
 
 ---
 
@@ -126,25 +126,27 @@ Running `python demo.py` executes four scenarios in sequence:
 
 ### Scenario 1 — BC → RT Write
 
-The BC sends the string `NAVIGATE` to RT-02 subaddress 01. The RT receives the data words, updates its subaddress buffer, and acknowledges with a status word.
+The BC sends the string `NAVIGATE` to RT-02 subaddress 01. The RT receives the data words, updates its subaddress buffer, and acknowledges with a status word. The BC verifies the acknowledgement by checking the `message_error_bit` in the returned status word.
 
-### Scenario 2 — BC → RT Read
+### Scenario 2 — BC → RT Read (Telemetry Poll)
 
-The BC polls RT-02 subaddress 01. The RT responds with a status word followed by data words containing the current buffer contents.
+The BC polls RT-02 subaddress 02 (Altitude). The RT responds with a status word followed by data words containing the current buffer contents (`ALT32000`).
 
 ### Scenario 3 — Full Telemetry Poll
 
 The BC sequentially polls all three RT subaddresses, simulating a mission computer reading avionics telemetry:
 
-| Subaddress | Data       | Meaning            |
-| ---------- | ---------- | ------------------ |
-| 01         | `HDG095`   | Heading 095°       |
-| 02         | `ALT32000` | Altitude 32,000 ft |
-| 03         | `SPD04800` | Airspeed 480 knots |
+| Subaddress | Initial data | Meaning            |
+| ---------- | ------------ | ------------------ |
+| 01         | `HDG095`     | Heading 095°       |
+| 02         | `ALT32000`   | Altitude 32,000 ft |
+| 03         | `SPD04800`   | Airspeed 480 knots |
 
-### Scenario 4 — Fault Simulation
+> **Note:** Scenario 1 writes `NAVIGATE` to subaddress 01, so the Scenario 3 poll of SA 01 returns `NAVIGATE` rather than the initial `HDG095`. This is correct behaviour — the RT's subaddress buffer reflects the most recent write.
 
-The RT is restarted with `drop_response=True`, simulating a terminal that has gone offline. The BC transmits a command, receives no status word within the timeout window, and marks RT-02 as unresponsive — demonstrating the fault tolerance behavior required by MIL-STD-1553B.
+### Scenario 4 — Fault Simulation: Bus A Failure with Bus B Failover
+
+The RT is restarted configured to drop all responses on Bus A, simulating a Bus A hardware failure. The BC transmits a command on Bus A and receives no status word within the timeout window. It then automatically retransmits on Bus B, where the RT responds normally. This demonstrates the dual-redundancy failover behaviour required by MIL-STD-1553B §4.2.
 
 ---
 
@@ -152,6 +154,8 @@ The RT is restarted with `drop_response=True`, simulating a terminal that has go
 
 **Timing:** Real MIL-STD-1553 operates at 1 Mbit/s with a 4 µs inter-message gap and a 14 µs no-response timeout. This simulator uses `time.sleep()` delays in the range of seconds for demo visibility.
 
-**Parity:** The parity bit is simulated as always-valid (`1`). Real implementations use odd parity computed over the 16-bit payload.
+**Parity:** Odd parity is computed over the 16-bit payload of every word and validated on decode. If a received word's parity bit does not match the computed value, the decoded result includes `parity_error: True` and a warning is printed.
 
-**Dual redundancy:** The physical layer supports Bus A and Bus B with automatic failover on transmission error, matching the MIL-STD-1553B §4.2 requirement that all terminals connect to both buses.
+**Word count encoding:** Per MIL-STD-1553B, a word count field of `00000` encodes 32 data words (not zero). This is handled correctly in both the encoder and decoder.
+
+**Dual redundancy:** The BC maintains independent sender and listener instances for Bus A and Bus B. On each transaction it transmits on the active bus and waits up to 3 seconds for a status-word acknowledgement. If none arrives, it switches the active bus and retransmits — matching the MIL-STD-1553B §4.2 no-response / alternate-bus retry requirement. The RT listens and responds independently on both buses.
